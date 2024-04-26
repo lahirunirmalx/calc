@@ -121,7 +121,6 @@ static void print_number (GtkWidget *widget, gpointer   data) {
     const gchar *current_text = gtk_entry_get_text(GTK_ENTRY(textBox));
     gchar *new_text = g_strdup_printf("%s%s", current_text,label_text);
     
-    g_print("Button label: %s\n", label_text);
     gtk_entry_set_text(GTK_ENTRY(textBox), new_text);
     g_free(new_text);
 }
@@ -131,7 +130,7 @@ static void clear_display (GtkWidget *widget, gpointer   data) {
     opTwo = 0.0;
     opp =OPP_UND;
     dis = DIS_KEP;
-	g_print("display vlaue cleared \n");
+	 
 	}
 
 
