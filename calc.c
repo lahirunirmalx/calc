@@ -38,10 +38,14 @@
 #define OPP_MUL 4 
 #define OPP_UND 5 
 
+#define DIS_CLR 1
+#define DIS_KEP 2
+
 GObject *textBox;
 double opOne;
 double opTwo;
 int    opp;
+int    dis;
 
 
 static void remove_first_char(char *str) {
@@ -108,9 +112,13 @@ static bool has_negative(const char* str) {
 }
 
 static void print_number (GtkWidget *widget, gpointer   data) {
+	 if(dis == DIS_CLR){
+		 gtk_entry_set_text(GTK_ENTRY(textBox), "");
+		 dis = DIS_KEP;
+		 }
     GtkButton *gtk_button = GTK_BUTTON(widget);  
     const gchar *label_text = gtk_button_get_label(gtk_button);
-   const gchar *current_text = gtk_entry_get_text(GTK_ENTRY(textBox));
+    const gchar *current_text = gtk_entry_get_text(GTK_ENTRY(textBox));
     gchar *new_text = g_strdup_printf("%s%s", current_text,label_text);
     
     g_print("Button label: %s\n", label_text);
@@ -122,6 +130,7 @@ static void clear_display (GtkWidget *widget, gpointer   data) {
 	opOne = 0.0;
     opTwo = 0.0;
     opp =OPP_UND;
+    dis = DIS_KEP;
 	g_print("display vlaue cleared \n");
 	}
 
@@ -159,49 +168,63 @@ static void togal_sign (GtkWidget *widget, gpointer   data) {
        g_free(new_text);
 	 }  
 	}
-	static void do_equl (GtkWidget *widget, gpointer   data) {
-		switch (opp) {
-		  case OPP_ADD:
-			break;
-		  case OPP_SUB:
-			break;
-		  case OPP_MUL:
-			break;
-		  case OPP_DIV: 
-			break;
-		  default: 
-			break;
+
+  static void do_operation(GtkWidget *widget, gpointer data, int operation) {
+  opp = operation;
+  const char *current_text = gtk_entry_get_text(GTK_ENTRY(textBox));
+
+  if (opOne == 0.0) {
+    string_to_decimal(current_text, &opOne);
+    gtk_entry_set_text(GTK_ENTRY(textBox), "");
+  } else {
+    double opTwo;
+    string_to_decimal(current_text, &opTwo);
+
+    switch (operation) {
+      case OPP_ADD:
+        opOne += opTwo;
+        break;
+      case OPP_SUB:
+        opOne -= opTwo;
+        break;
+      case OPP_MUL:
+        opOne *= opTwo;
+        break;
+      case OPP_DIV:
+        if (opTwo != 0.0) {
+          opOne /= opTwo;
+        } else {
+           gtk_entry_set_text(GTK_ENTRY(textBox), "014 32202");
+          return;
         }
-			 
- }
- 
- static void do_add (GtkWidget *widget, gpointer   data) {
-		  opp =OPP_ADD;
-		  const char *current_text = gtk_entry_get_text(GTK_ENTRY(textBox)); 
-		  if(opOne == 0.0){
-			  string_to_decimal(current_text,&opOne);
-			   gtk_entry_set_text(GTK_ENTRY(textBox), "");
-		  } else {
-			  string_to_decimal(current_text,&opTwo); 
-			 opOne = opOne + opTwo; 
-			   gchar *new_text = g_strdup_printf("%.2lf", opOne );
-		       gtk_entry_set_text(GTK_ENTRY(textBox), new_text);
-               g_free(new_text);
-		  }
-		
-			 
- }
- static void do_sub (GtkWidget *widget, gpointer   data) {
-		  opp =OPP_SUB;
-			 
- }
- static void do_mul (GtkWidget *widget, gpointer   data) {
-		  opp =OPP_MUL;
-			 
- }
-  static void do_div (GtkWidget *widget, gpointer   data) {
-		  opp =OPP_DIV;
-			 
+        break;
+    }
+
+    gchar *new_text = g_strdup_printf("%.2lf", opOne);
+    gtk_entry_set_text(GTK_ENTRY(textBox), new_text);
+    g_free(new_text);
+  }
+
+  dis = DIS_CLR;
+}
+static void do_add(GtkWidget *widget, gpointer data) {
+  do_operation(widget, data, OPP_ADD);
+}
+
+static void do_sub(GtkWidget *widget, gpointer data) {
+  do_operation(widget, data, OPP_SUB);
+}
+
+static void do_mul(GtkWidget *widget, gpointer data) {
+  do_operation(widget, data, OPP_MUL);
+}
+
+static void do_div(GtkWidget *widget, gpointer data) {
+  do_operation(widget, data, OPP_DIV);
+}
+
+static void do_equl (GtkWidget *widget, gpointer   data) {
+ do_operation(widget, data, opp);
  }
 int _init_ui(int   argc,  char *argv[]){
   GtkBuilder *builder;
@@ -255,6 +278,15 @@ int _init_ui(int   argc,  char *argv[]){
          
          button = gtk_builder_get_object (builder, "btnsum" );
          g_signal_connect (button, "clicked", G_CALLBACK (do_add), NULL);
+         button = gtk_builder_get_object (builder, "btnmin" );
+         g_signal_connect (button, "clicked", G_CALLBACK (do_sub), NULL);
+  
+         button = gtk_builder_get_object (builder, "btnmul" );
+         g_signal_connect (button, "clicked", G_CALLBACK (do_mul), NULL);
+  
+         button = gtk_builder_get_object (builder, "btndiv" );
+         g_signal_connect (button, "clicked", G_CALLBACK (do_div), NULL);
+  
   
   gtk_main ();
 
