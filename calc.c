@@ -22,15 +22,15 @@
  */
 
 
-#include <stdio.h>
-#include <stdbool.h> 
-#include <gtk/gtk.h> 
-#include <string.h>
-#include <math.h>
+#include "calc_core.h"
 
-#define NUM_BUTTONS  10 
+#include <stdio.h>
+#include <stdbool.h>
+#include <gtk/gtk.h>
+#include <string.h>
+
+#define NUM_BUTTONS  10
 #define NUM_NAME_LENGTH  40
-#define NUM_VALUE_LENGTH  10 
 
 #define OPP_ADD 1
 #define OPP_DIV 2 
@@ -42,50 +42,21 @@
 #define DIS_KEP 2
 
 GObject *textBox;
-double opOne;
-double opTwo;
-int    opp;
-int    dis;
+static double opOne;
+static int opp;
+static int dis;
+static CalcPhase phase;
 
 
-static void remove_first_char(char *str) {
-  int len = strlen(str);
-  if (len > 0) { 
-    memmove(str, str + 1, len - 1); 
-    str[len - 1] = '\0';
-  }
+static void
+remove_first_char(char *str)
+{
+	int len = (int)strlen(str);
+	if (len > 0) {
+		memmove(str, str + 1, (size_t)(len - 1));
+		str[len - 1] = '\0';
+	}
 }
-
-
-static int string_to_decimal(const char *str, double *decimal_value) {
-  double value = 0.0;
-  int decimal_place = 0;
-  bool is_negative = false;
-
-  if (*str == '-') {
-    is_negative = true;
-    str++;  // Skip the minus sign
-  }
-
-  while (*str != '\0') {
-    if (*str >= '0' && *str <= '9') {
-      value = value * 10 + (*str - '0');
-    } else if (*str == '.' && decimal_place == 0) {
-      decimal_place = 1;
-    } else {
-      return -1;  // Invalid character encountered
-    }
-    str++;
-  }
-
-  if (decimal_place > 0) {
-    value /= pow(10, decimal_place);
-  }
-
-  *decimal_value = is_negative ? -value : value;
-  return 0;
-}
-
 
 static bool is_empty(const char* str) {
   return *str == '\0';
@@ -111,120 +82,171 @@ static bool has_negative(const char* str) {
   return false;
 }
 
-static void print_number (GtkWidget *widget, gpointer   data) {
-	 if(dis == DIS_CLR){
-		 gtk_entry_set_text(GTK_ENTRY(textBox), "");
-		 dis = DIS_KEP;
-		 }
-    GtkButton *gtk_button = GTK_BUTTON(widget);  
-    const gchar *label_text = gtk_button_get_label(gtk_button);
-    const gchar *current_text = gtk_entry_get_text(GTK_ENTRY(textBox));
-    gchar *new_text = g_strdup_printf("%s%s", current_text,label_text);
-    
-    gtk_entry_set_text(GTK_ENTRY(textBox), new_text);
-    g_free(new_text);
+static void print_number(GtkWidget *widget, gpointer data)
+{
+	(void)data;
+
+	if (dis == DIS_CLR) {
+		/* new digit after a finished result: drop stale acc/op, see review */
+		if (phase == CALC_NEED_LHS) {
+			opOne = 0.0;
+			opp = OPP_UND;
+		}
+		gtk_entry_set_text(GTK_ENTRY(textBox), "");
+		dis = DIS_KEP;
+	}
+	{
+		GtkButton *gtk_button = GTK_BUTTON(widget);
+		const gchar *label_text = gtk_button_get_label(gtk_button);
+		const gchar *current_text = gtk_entry_get_text(GTK_ENTRY(textBox));
+		gchar *new_text = g_strdup_printf("%s%s", current_text, label_text);
+
+		gtk_entry_set_text(GTK_ENTRY(textBox), new_text);
+		g_free(new_text);
+	}
 }
-static void clear_display (GtkWidget *widget, gpointer   data) {
+static void clear_display(GtkWidget *widget, gpointer data)
+{
+	(void)widget;
+	(void)data;
 	gtk_entry_set_text(GTK_ENTRY(textBox), "");
 	opOne = 0.0;
-    opTwo = 0.0;
-    opp =OPP_UND;
-    dis = DIS_KEP;
-	 
-	}
+	opp = OPP_UND;
+	phase = CALC_NEED_LHS;
+	dis = DIS_KEP;
+}
 
 
 	
-static void add_dot (GtkWidget *widget, gpointer   data) {
-	const char *current_text = gtk_entry_get_text(GTK_ENTRY(textBox)); 
-	gchar *new_text;
-	 if(!has_period(current_text)){ 
-		if (is_empty(current_text)) { 
-           new_text = g_strdup_printf("%s%s", "0","."); 
+static void add_dot(GtkWidget *widget, gpointer data)
+{
+	(void)widget;
+	(void)data;
+	{
+		const char *current_text = gtk_entry_get_text(GTK_ENTRY(textBox));
+		gchar *new_text;
 
-       } else { 
-           new_text = g_strdup_printf("%s%s", current_text,".");
-      
-       }
-       gtk_entry_set_text(GTK_ENTRY(textBox), new_text);
-       g_free(new_text);
-	 }  
-	}	
-
-static void togal_sign (GtkWidget *widget, gpointer   data) {
-	const char *current_text = gtk_entry_get_text(GTK_ENTRY(textBox)); 
-	gchar *new_text;
-	 if(!is_empty(current_text)){ 
-		if (has_negative(current_text)) { 
-           new_text = g_strdup_printf("%s", current_text); 
-           remove_first_char(new_text);
-
-       } else { 
-           new_text = g_strdup_printf("%s%s", "-",current_text);
-      
-       }
-       gtk_entry_set_text(GTK_ENTRY(textBox), new_text);
-       g_free(new_text);
-	 }  
+		if (!has_period(current_text)) {
+			if (is_empty(current_text)) {
+				new_text = g_strdup_printf("%s%s", "0", ".");
+			} else {
+				new_text = g_strdup_printf("%s%s", current_text, ".");
+			}
+			gtk_entry_set_text(GTK_ENTRY(textBox), new_text);
+			g_free(new_text);
+		}
 	}
-
-  static void do_operation(GtkWidget *widget, gpointer data, int operation) {
-  opp = operation;
-  const char *current_text = gtk_entry_get_text(GTK_ENTRY(textBox));
-
-  if (opOne == 0.0) {
-    string_to_decimal(current_text, &opOne);
-    gtk_entry_set_text(GTK_ENTRY(textBox), "");
-  } else {
-    double opTwo;
-    string_to_decimal(current_text, &opTwo);
-
-    switch (operation) {
-      case OPP_ADD:
-        opOne += opTwo;
-        break;
-      case OPP_SUB:
-        opOne -= opTwo;
-        break;
-      case OPP_MUL:
-        opOne *= opTwo;
-        break;
-      case OPP_DIV:
-        if (opTwo != 0.0) {
-          opOne /= opTwo;
-        } else {
-           gtk_entry_set_text(GTK_ENTRY(textBox), "014 32202");
-          return;
-        }
-        break;
-    }
-
-    gchar *new_text = g_strdup_printf("%.2lf", opOne);
-    gtk_entry_set_text(GTK_ENTRY(textBox), new_text);
-    g_free(new_text);
-  }
-
-  dis = DIS_CLR;
-}
-static void do_add(GtkWidget *widget, gpointer data) {
-  do_operation(widget, data, OPP_ADD);
 }
 
-static void do_sub(GtkWidget *widget, gpointer data) {
-  do_operation(widget, data, OPP_SUB);
+static void togal_sign(GtkWidget *widget, gpointer data)
+{
+	(void)widget;
+	(void)data;
+	{
+		const char *current_text = gtk_entry_get_text(GTK_ENTRY(textBox));
+		gchar *new_text;
+
+		if (!is_empty(current_text)) {
+			if (has_negative(current_text)) {
+				new_text = g_strdup_printf("%s", current_text);
+				remove_first_char(new_text);
+			} else {
+				new_text = g_strdup_printf("%s%s", "-", current_text);
+			}
+			gtk_entry_set_text(GTK_ENTRY(textBox), new_text);
+			g_free(new_text);
+		}
+	}
 }
 
-static void do_mul(GtkWidget *widget, gpointer data) {
-  do_operation(widget, data, OPP_MUL);
-}
+static void do_operation(GtkWidget *widget, gpointer data, int operation, bool is_equal)
+{
+	(void)widget;
+	(void)data;
+	{
+		const char *current_text = gtk_entry_get_text(GTK_ENTRY(textBox));
+		double rhs;
 
-static void do_div(GtkWidget *widget, gpointer data) {
-  do_operation(widget, data, OPP_DIV);
+		opp = operation;
+		if (phase == CALC_NEED_LHS) {
+			if (calc_parse_entry(current_text, &opOne) != 0) {
+				gtk_entry_set_text(GTK_ENTRY(textBox), "ERROR");
+				return;
+			}
+			phase = CALC_NEED_RHS;
+			gtk_entry_set_text(GTK_ENTRY(textBox), "");
+		} else {
+			if (calc_parse_entry(current_text, &rhs) != 0) {
+				gtk_entry_set_text(GTK_ENTRY(textBox), "ERROR");
+				return;
+			}
+			switch (operation) {
+			case OPP_ADD:
+				opOne += rhs;
+				break;
+			case OPP_SUB:
+				opOne -= rhs;
+				break;
+			case OPP_MUL:
+				opOne *= rhs;
+				break;
+			case OPP_DIV:
+				if (rhs != 0.0) {
+					opOne /= rhs;
+				} else {
+					gtk_entry_set_text(GTK_ENTRY(textBox), "014 32202");
+					return;
+				}
+				break;
+			default:
+				break;
+			}
+			{
+				gchar *new_text = g_strdup_printf("%.2lf", opOne);
+				gtk_entry_set_text(GTK_ENTRY(textBox), new_text);
+				g_free(new_text);
+			}
+		}
+		dis = DIS_CLR;
+	}
+	if (is_equal) {
+		phase = CALC_NEED_LHS;
+	}
 }
-
-static void do_equl (GtkWidget *widget, gpointer   data) {
- do_operation(widget, data, opp);
- }
+static void do_binary_op(int operation)
+{
+	do_operation(NULL, NULL, operation, false);
+}
+static void do_add(GtkWidget *widget, gpointer data)
+{
+	(void)widget;
+	(void)data;
+	do_binary_op(OPP_ADD);
+}
+static void do_sub(GtkWidget *widget, gpointer data)
+{
+	(void)widget;
+	(void)data;
+	do_binary_op(OPP_SUB);
+}
+static void do_mul(GtkWidget *widget, gpointer data)
+{
+	(void)widget;
+	(void)data;
+	do_binary_op(OPP_MUL);
+}
+static void do_div(GtkWidget *widget, gpointer data)
+{
+	(void)widget;
+	(void)data;
+	do_binary_op(OPP_DIV);
+}
+static void do_equl(GtkWidget *widget, gpointer data)
+{
+	(void)widget;
+	(void)data;
+	do_operation(NULL, NULL, opp, true);
+}
 int _init_ui(int   argc,  char *argv[]){
   GtkBuilder *builder;
   GObject *window;
@@ -233,8 +255,8 @@ int _init_ui(int   argc,  char *argv[]){
   GError *error = NULL;
 
    opOne = 0.0;
-   opTwo = 0.0;
-   opp =OPP_UND;
+   opp = OPP_UND;
+   phase = CALC_NEED_LHS;
 
   gtk_init (&argc, &argv);
 
@@ -249,20 +271,31 @@ int _init_ui(int   argc,  char *argv[]){
 
   /* Connect signal handlers to the constructed widgets. */
   window = gtk_builder_get_object (builder, "window1");
+  if (window == NULL) {
+    g_printerr ("Missing object: window1\n");
+    g_object_unref (builder);
+    return 1;
+  }
   g_signal_connect (window, "destroy", G_CALLBACK (gtk_main_quit), NULL);
-   textBox = gtk_builder_get_object (builder, "textDisplay");
+  textBox = gtk_builder_get_object (builder, "textDisplay");
+  if (textBox == NULL) {
+    g_printerr ("Missing object: textDisplay\n");
+    g_object_unref (builder);
+    return 1;
+  }
   
-  for (int i = 0;i < NUM_BUTTONS;i ++){
-	    char btnName[NUM_NAME_LENGTH] = "btn";
-	    char btnNum[NUM_VALUE_LENGTH];
-	    sprintf(btnNum,"%d",i);
-	    strcat(btnName,btnNum);
-	    button = gtk_builder_get_object (builder, btnName );
-        g_signal_connect (button, "clicked", G_CALLBACK (print_number), btnNum);
+  for (int i = 0; i < NUM_BUTTONS; i++) {
+		char btnName[NUM_NAME_LENGTH];
+		g_snprintf (btnName, sizeof (btnName), "btn%d", i);
+		button = gtk_builder_get_object (builder, btnName);
+		if (button == NULL) {
+			g_printerr ("Missing widget: %s\n", btnName);
+			g_object_unref (builder);
+			return 1;
+		}
+		g_signal_connect (button, "clicked", G_CALLBACK (print_number), NULL);
+	}
 
-	  }
-  
-  
         button = gtk_builder_get_object (builder, "btnac" );
         g_signal_connect (button, "clicked", G_CALLBACK (clear_display), NULL);
         
@@ -285,8 +318,9 @@ int _init_ui(int   argc,  char *argv[]){
   
          button = gtk_builder_get_object (builder, "btndiv" );
          g_signal_connect (button, "clicked", G_CALLBACK (do_div), NULL);
-  
-  
+
+  g_object_unref (builder);
+  builder = NULL;
   gtk_main ();
 
   return 0;

@@ -1,0 +1,5 @@
+# build outputs
+/calc
+/calc2
+/calc_sdl
+*.o
